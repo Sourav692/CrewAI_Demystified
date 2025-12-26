@@ -1,0 +1,13 @@
+# Core CrewAI dependencies
+crewai>=1.7.0
+crewai-tools
+
+# Environment management
+python-dotenv
+
+# Data validation
+pydantic
+
+# Async support for nested event loops (used in notebook)
+nest-asyncio
+

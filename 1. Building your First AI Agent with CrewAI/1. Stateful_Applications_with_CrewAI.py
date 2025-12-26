@@ -29,6 +29,7 @@ guide_recipe_steps = Task(
     description="Provide step-by-step instructions for the selected recipe.",
     expected_output="Step-by-step cooking instructions for the chosen recipe.",
     agent=culinary_assistant,
+    context=[find_and_filter_recipes],
 )
 
 crew = Crew(
