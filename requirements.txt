@@ -11,3 +11,5 @@ pydantic
 # Async support for nested event loops (used in notebook)
 nest-asyncio
 
+# Markdown rendering
+markdown
