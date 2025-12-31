@@ -2,8 +2,8 @@ from crewai import Agent, Crew, Task, Process
 from mem0 import MemoryClient
 import os
 
-# Set up API key
-os.environ['OPENAI_API_KEY'] = "YOUR_OPENAI_API_KEY"
+from dotenv import load_dotenv
+load_dotenv()
 
 def get_recommendation(user_id: str, user_preferences: str) -> str:
     recommendation_agent = Agent(
@@ -27,7 +27,7 @@ def get_recommendation(user_id: str, user_preferences: str) -> str:
         memory=True,
         memory_config={
             "provider": "mem0",
-            "config": {"user_id": user_id, "api_key": "m0-R5BIOR7mMfo8LViJKAAdt6eF6FwTrKGzeLxRO7F5"},
+            "config": {"user_id": user_id, "api_key": "m0-WdLTRzEc7XYRX6KLGpPmWYY8KaxuKBeuYRYPn7xo"},
         }
     )
 
@@ -44,7 +44,7 @@ def store_user_recommendation(client: MemoryClient, user_id: str, conversation: 
 
 
 if __name__ == '__main__':
-    client = MemoryClient(api_key="m0-R5BIOR7mMfo8LViJKAAdt6eF6FwTrKGzeLxRO7F5")
+    client = MemoryClient(api_key="m0-WdLTRzEc7XYRX6KLGpPmWYY8KaxuKBeuYRYPn7xo")
 
     user_id = input("Enter user ID: ").strip()
     user_preferences = input("Enter preferences: ").strip()
