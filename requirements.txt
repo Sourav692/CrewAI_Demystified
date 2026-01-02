@@ -13,3 +13,5 @@ nest-asyncio
 
 # Markdown rendering
 markdown
+
+langchain_community
