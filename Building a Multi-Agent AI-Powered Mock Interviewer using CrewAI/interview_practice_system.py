@@ -105,16 +105,17 @@ def create_evaluation_task(
         agent=answer_evaluator,
     )
 
-
+# Updated to include user_answer
 def create_follow_up_question_task(
-    question: str, company_name: str, role: str, difficulty: str
+    question: str, user_answer: str, company_name: str, role: str, difficulty: str
 ) -> Task:
     return Task(
-        description=f"""Based on the following context, create a relevant follow-up question:
+        description=f"""Based on the context, create a relevant follow-up question:
         Original Question: {question}
+        Candidate's Answer: {user_answer}
         Company: {company_name}
         Role: {role}
-        Difficulty Level: {difficulty}
+        Difficulty: {difficulty}
         
         Create a follow-up question that:
         1. Builds upon the original question
@@ -124,7 +125,7 @@ def create_follow_up_question_task(
         
         The follow-up question should be challenging but fair, and should help
         assess the candidate's technical depth and problem-solving abilities.""",
-        expected_output="A follow-up question that builds upon the original question",
+        expected_output="A follow-up question that builds upon the candidate's specific answer",
         output_pydantic=QuestionAnswerPair,
         agent=follow_up_questioner,
     )
@@ -146,20 +147,30 @@ def create_follow_up_crew(
 
 
 async def generate_follow_up_question(
-    question: str, company_name: str, role: str, difficulty: str
+    question: str, user_answer: str, company_name: str, role: str, difficulty: str
 ) -> QuestionAnswerPair:
-    """Generate a follow-up question asynchronously."""
-    result = await create_follow_up_crew(
-        question, company_name, role, difficulty
-    ).kickoff_async()
+    crew = Crew(
+        agents=[follow_up_questioner],
+        tasks=[
+            # Pass user_answer here
+            create_follow_up_question_task(question, user_answer, company_name, role, difficulty),
+        ],
+        process=Process.sequential,
+        verbose=True,
+    )
+    result = await crew.kickoff_async()
     return result.pydantic
 
 
-# Function to start the interview practice
 async def start_interview_practice(
     company_name: str, role: str, difficulty: str = "easy"
 ):
-    # First Crew: Prepare the question and answer
+    # ---------------------------------------------------------
+    # 1. PREPARATION PHASE (Silent)
+    # ---------------------------------------------------------
+    print(f"Researching {company_name} and preparing your question... (this may take a moment)")
+    
+    # Set verbose=False here to hide the 'Correct Answer' from the console
     preparation_crew = Crew(
         agents=[company_researcher, question_preparer],
         tasks=[
@@ -167,75 +178,96 @@ async def start_interview_practice(
             create_question_preparation_task(difficulty),
         ],
         process=Process.sequential,
-        verbose=True,
+        verbose=False,  # <--- CRITICAL CHANGE: Prevents spoilers
     )
 
-    # Execute the first crew to get the question and model answer
+    # This runs synchronously because we CANNOT proceed without the question
     preparation_result = preparation_crew.kickoff()
+    
+    # Extract data safely
+    try:
+        current_question = preparation_result.pydantic.question
+        correct_answer = preparation_result.pydantic.correct_answer
+    except AttributeError:
+        # Fallback if pydantic parsing fails
+        current_question = str(preparation_result)
+        correct_answer = "Model answer not available."
 
-    # Generate follow-up question right after preparation (async)
+    question_number = 1
+    
+    # ---------------------------------------------------------
+    # CONTINUOUS INTERVIEW LOOP
+    # ---------------------------------------------------------
+    while True:
+        # ---------------------------------------------------------
+        # 2. USER INTERACTION
+        # ---------------------------------------------------------
+        print("\n" + "="*50)
+        print(f"INTERVIEW QUESTION #{question_number}")
+        print("="*50)
+        print(current_question)
+        print("="*50)
+        print("\n(Type 'quit' or 'exit' to end the interview session)\n")
+        
+        # The code effectively pauses here for user input
+        user_answer = input("Your answer: ")
+        
+        # Check for exit commands
+        if user_answer.lower().strip() in ['quit', 'exit', 'q']:
+            print("\n" + "="*50)
+            print("INTERVIEW SESSION ENDED")
+            print("="*50)
+            print(f"You completed {question_number - 1} question(s) in this session.")
+            print("Thank you for practicing! Good luck with your interview!")
+            print("="*50)
+            break
 
-    follow_up_question_task = asyncio.create_task(
-        generate_follow_up_question(
-            question=preparation_result.pydantic.question,
+        print("\nAnalyzing your answer and generating follow-up...")
+
+        # ---------------------------------------------------------
+        # 3. EVALUATION & FOLLOW-UP (Async & Parallel)
+        # ---------------------------------------------------------
+        
+        # Task A: Evaluate (We can use verbose=True here as the user has already answered)
+        eval_crew = Crew(
+            agents=[answer_evaluator],
+            tasks=[create_evaluation_task(current_question, user_answer, correct_answer)],
+            verbose=True 
+        )
+        
+        # Task B: Generate Follow-up (using the REAL user answer)
+        follow_up_task = generate_follow_up_question(
+            question=current_question,
+            user_answer=user_answer,
             company_name=company_name,
             role=role,
-            difficulty=difficulty,
+            difficulty=difficulty
         )
-    )
 
-    # Print the main question and get user's answer
-    print("\nQuestion:")
-    print(preparation_result.pydantic.question)
-    user_answer = input("\nYour answer: ")
+        # Run both simultaneously
+        evaluation_result, follow_up_result = await asyncio.gather(
+            eval_crew.kickoff_async(),
+            follow_up_task
+        )
 
-    # Second Crew: Evaluate the answer
-    evaluation_crew = Crew(
-        agents=[answer_evaluator],
-        tasks=[
-            create_evaluation_task(
-                question=preparation_result.pydantic.question,
-                user_answer=user_answer,
-                correct_answer=preparation_result.pydantic.correct_answer,
-            )
-        ],
-        process=Process.sequential,
-        verbose=True,
-    )
+        # ---------------------------------------------------------
+        # 4. DISPLAY EVALUATION RESULTS
+        # ---------------------------------------------------------
+        # Evaluation result is printed automatically by verbose=True in eval_crew
 
-    # Execute the second crew and get evaluation
-    evaluation_result = evaluation_crew.kickoff()
-    print("\nEvaluation:")
-    print(evaluation_result)
+        input("\nPress Enter to continue to the next question...")
 
-    input("\nPress Enter to continue to the follow-up question...")
-
-    # Get the follow-up question (it should be ready by now)
-    follow_up_question_result = await follow_up_question_task
-
-    # Show the pre-generated follow-up question
-    print("\nFollow-up Question:")
-    print(follow_up_question_result.question)
-    follow_up_answer = input("\nYour answer to the follow-up: ")
-
-    # Evaluate the follow-up answer
-    follow_up_evaluation_crew = Crew(
-        agents=[answer_evaluator],
-        tasks=[
-            create_evaluation_task(
-                question=follow_up_question_result.question,
-                user_answer=follow_up_answer,
-                correct_answer=follow_up_question_result.correct_answer,
-            )
-        ],
-        process=Process.sequential,
-        verbose=True,
-    )
-
-    # Execute the follow-up evaluation
-    follow_up_evaluation = follow_up_evaluation_crew.kickoff()
-    print("\nFollow-up Evaluation:")
-    print(follow_up_evaluation)
+        # ---------------------------------------------------------
+        # 5. PREPARE NEXT QUESTION (Follow-up becomes the new current question)
+        # ---------------------------------------------------------
+        try:
+            current_question = follow_up_result.question
+            correct_answer = follow_up_result.correct_answer
+        except AttributeError:
+            current_question = str(follow_up_result)
+            correct_answer = "Model answer not available."
+        
+        question_number += 1
 
 
 if __name__ == "__main__":

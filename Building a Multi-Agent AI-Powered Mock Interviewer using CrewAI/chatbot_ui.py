@@ -73,8 +73,7 @@ else:
             st.rerun()
 
 # Get user input
-st.write("Choose your input method:")
-input_method = st.radio("", ["Text", "Voice"], horizontal=True)
+input_method = st.radio("Choose your input method:", ["Text", "Voice"], horizontal=True)
 
 user_input = None  # Initialize user_input
 
@@ -149,6 +148,7 @@ if user_input is not None:
                 follow_up_result = asyncio.run(
                     generate_follow_up_question(
                         question=st.session_state.current_question,
+                        user_answer=user_input,  # Pass the user's answer for context
                         company_name=company_name,
                         role=role,
                         difficulty=difficulty.lower(),
