@@ -59,6 +59,20 @@ follow_up_questioner = Agent(
     verbose=True,
 )
 
+# Create the new topic question agent
+new_topic_questioner = Agent(
+    role="New Topic Question Specialist",
+    goal="Create interview questions on new technical topics",
+    backstory="""You are an expert technical interviewer who knows how to create
+    diverse interview questions across different technical domains. You can identify
+    new topics that haven't been covered yet and create questions that test
+    different aspects of a candidate's technical knowledge and skills.""",
+    verbose=True,
+)
+
+# Maximum number of follow-up questions per topic
+MAX_FOLLOWUPS_PER_TOPIC = 3
+
 
 # Create tasks for the first crew
 def create_company_research_task(company_name: str, role: str, difficulty: str) -> Task:
@@ -131,6 +145,35 @@ def create_follow_up_question_task(
     )
 
 
+# Task for generating a new topic question
+def create_new_topic_question_task(
+    company_name: str, role: str, difficulty: str, covered_topics: list[str]
+) -> Task:
+    topics_str = ", ".join(covered_topics) if covered_topics else "None yet"
+    return Task(
+        description=f"""Create a NEW interview question on a DIFFERENT technical topic:
+        Company: {company_name}
+        Role: {role}
+        Difficulty: {difficulty}
+        Topics Already Covered: {topics_str}
+        
+        Create a question that:
+        1. Is on a COMPLETELY DIFFERENT topic from those already covered
+        2. Tests a different area of technical knowledge relevant to the role
+        3. Is appropriate for the specified difficulty level
+        4. Is relevant to the company and role
+        
+        Choose from different domains like: SQL, Python coding, statistics, 
+        machine learning, data structures, system design, data pipelines, 
+        cloud services, algorithms, etc.
+        
+        The question should be challenging but fair for the difficulty level.""",
+        expected_output="A new question on a different topic with its correct answer",
+        output_pydantic=QuestionAnswerPair,
+        agent=new_topic_questioner,
+    )
+
+
 def create_follow_up_crew(
     question: str, company_name: str, role: str, difficulty: str
 ) -> Crew:
@@ -160,6 +203,28 @@ async def generate_follow_up_question(
     )
     result = await crew.kickoff_async()
     return result.pydantic
+
+
+async def generate_new_topic_question(
+    company_name: str, role: str, difficulty: str, covered_topics: list[str]
+) -> QuestionAnswerPair:
+    """Generate a new question on a different topic."""
+    crew = Crew(
+        agents=[new_topic_questioner],
+        tasks=[
+            create_new_topic_question_task(company_name, role, difficulty, covered_topics),
+        ],
+        process=Process.sequential,
+        verbose=True,
+    )
+    result = await crew.kickoff_async()
+    return result.pydantic
+
+
+def extract_topic_from_question(question: str) -> str:
+    """Extract a brief topic identifier from a question for tracking."""
+    # Take first 50 chars as a simple topic identifier
+    return question[:50].strip() + "..."
 
 
 async def start_interview_practice(
@@ -193,17 +258,27 @@ async def start_interview_practice(
         current_question = str(preparation_result)
         correct_answer = "Model answer not available."
 
+    # Tracking variables
     question_number = 1
+    topic_number = 1
+    follow_up_count = 0  # Count of follow-ups for current topic
+    covered_topics: list[str] = [extract_topic_from_question(current_question)]
     
     # ---------------------------------------------------------
     # CONTINUOUS INTERVIEW LOOP
     # ---------------------------------------------------------
     while True:
+        # Determine if this is a new topic or a follow-up
+        is_new_topic = follow_up_count == 0
+        
         # ---------------------------------------------------------
         # 2. USER INTERACTION
         # ---------------------------------------------------------
         print("\n" + "="*50)
-        print(f"INTERVIEW QUESTION #{question_number}")
+        if is_new_topic:
+            print(f"📚 NEW TOPIC #{topic_number} - QUESTION #{question_number}")
+        else:
+            print(f"📚 TOPIC #{topic_number} - FOLLOW-UP {follow_up_count}/{MAX_FOLLOWUPS_PER_TOPIC} - QUESTION #{question_number}")
         print("="*50)
         print(current_question)
         print("="*50)
@@ -217,15 +292,13 @@ async def start_interview_practice(
             print("\n" + "="*50)
             print("INTERVIEW SESSION ENDED")
             print("="*50)
-            print(f"You completed {question_number - 1} question(s) in this session.")
+            print(f"You completed {question_number - 1} question(s) across {topic_number} topic(s).")
             print("Thank you for practicing! Good luck with your interview!")
             print("="*50)
             break
 
-        print("\nAnalyzing your answer and generating follow-up...")
-
         # ---------------------------------------------------------
-        # 3. EVALUATION & FOLLOW-UP (Async & Parallel)
+        # 3. EVALUATION & NEXT QUESTION GENERATION (Async & Parallel)
         # ---------------------------------------------------------
         
         # Task A: Evaluate (We can use verbose=True here as the user has already answered)
@@ -235,19 +308,32 @@ async def start_interview_practice(
             verbose=True 
         )
         
-        # Task B: Generate Follow-up (using the REAL user answer)
-        follow_up_task = generate_follow_up_question(
-            question=current_question,
-            user_answer=user_answer,
-            company_name=company_name,
-            role=role,
-            difficulty=difficulty
-        )
+        # Task B: Generate next question
+        # Check if we've reached max follow-ups for this topic
+        if follow_up_count >= MAX_FOLLOWUPS_PER_TOPIC:
+            # Switch to a new topic
+            print(f"\n🔄 Max follow-ups reached for this topic. Switching to a NEW topic...")
+            next_question_task = generate_new_topic_question(
+                company_name=company_name,
+                role=role,
+                difficulty=difficulty,
+                covered_topics=covered_topics
+            )
+        else:
+            # Continue with follow-up on same topic
+            print("\nAnalyzing your answer and generating follow-up...")
+            next_question_task = generate_follow_up_question(
+                question=current_question,
+                user_answer=user_answer,
+                company_name=company_name,
+                role=role,
+                difficulty=difficulty
+            )
 
         # Run both simultaneously
-        evaluation_result, follow_up_result = await asyncio.gather(
+        evaluation_result, next_question_result = await asyncio.gather(
             eval_crew.kickoff_async(),
-            follow_up_task
+            next_question_task
         )
 
         # ---------------------------------------------------------
@@ -258,14 +344,24 @@ async def start_interview_practice(
         input("\nPress Enter to continue to the next question...")
 
         # ---------------------------------------------------------
-        # 5. PREPARE NEXT QUESTION (Follow-up becomes the new current question)
+        # 5. PREPARE NEXT QUESTION
         # ---------------------------------------------------------
         try:
-            current_question = follow_up_result.question
-            correct_answer = follow_up_result.correct_answer
+            current_question = next_question_result.question
+            correct_answer = next_question_result.correct_answer
         except AttributeError:
-            current_question = str(follow_up_result)
+            current_question = str(next_question_result)
             correct_answer = "Model answer not available."
+        
+        # Update counters
+        if follow_up_count >= MAX_FOLLOWUPS_PER_TOPIC:
+            # Reset for new topic
+            follow_up_count = 0
+            topic_number += 1
+            covered_topics.append(extract_topic_from_question(current_question))
+        else:
+            # Increment follow-up count
+            follow_up_count += 1
         
         question_number += 1
 
