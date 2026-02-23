@@ -15,3 +15,5 @@ nest-asyncio
 markdown
 
 langchain_community
+langchain-openai
+langchain-groq
