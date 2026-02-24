@@ -1,6 +1,5 @@
 # Core CrewAI dependencies
-crewai>=1.7.0
-crewai-tools
+crewai[tools]
 
 # Environment management
 python-dotenv
@@ -14,6 +13,6 @@ nest-asyncio
 # Markdown rendering
 markdown
 
-langchain_community
+langchain-community
 langchain-openai
 langchain-groq
