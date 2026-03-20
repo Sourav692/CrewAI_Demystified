@@ -10,13 +10,20 @@ CrewAI is a powerful framework for orchestrating role-playing, autonomous AI age
 
 ```
 CrewAI_Demystified/
-├── Building your First AI Agent with CrewAI/
-│   ├── 1. Stateful_Applications_with_CrewAI.py
-│   ├── 2. Research Assistant in CrewAI.py
-│   ├── 3. Code Notebook.ipynb
-│   ├── 4. Workflow_with_CrewAI.py
+├── 01_basics/
+│   └── stateful_culinary_assistant.ipynb
+├── 02_multi_agent/
+│   ├── research_assistant.ipynb
+│   └── logistics_analysis.ipynb
+├── 03_flows/
+│   └── workflow_with_flows.ipynb
+├── 04_comprehensive/
+│   └── complete_tutorial.ipynb
+├── helpers/
+│   └── utils.py
+├── reference_docs/
 │   └── link.md
-├── requirements.txt
+├── pyproject.toml
 ├── LICENSE
 └── README.md
 ```
@@ -25,110 +32,82 @@ CrewAI_Demystified/
 
 ### Prerequisites
 
-- Python 3.8 or higher
-- OpenAI API key (or other LLM provider API key)
+- Python 3.11 or higher
+- API keys for your chosen LLM provider (Groq recommended)
 
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/yourusername/CrewAI_Demystified.git
 cd CrewAI_Demystified
 ```
 
 2. Install dependencies:
+
 ```bash
-pip install -r requirements.txt
+uv venv
+uv pip install -e ".[dev]"
 ```
 
-3. Set up your environment variables:
-   - Create a `.env` file in the project root
-   - Add your API key:
-     ```
-     OPENAI_API_KEY=your_api_key_here
-     ```
+3. Set up your environment variables — create a `.env` file in the project root:
+
+```env
+GROQ_API_KEY=your_groq_api_key_here
+SERPER_API_KEY=your_serper_api_key_here   # Only needed for research_assistant.ipynb
+```
 
 ## 📖 Examples
 
-### 1. Stateful Applications with CrewAI
+### 01_basics — Stateful Culinary Assistant
 
-**File:** `1. Stateful_Applications_with_CrewAI.py`
+**File:** `01_basics/stateful_culinary_assistant.ipynb`
 
-A culinary assistant agent that:
-- Finds recipes based on main ingredients
-- Filters recipes according to dietary restrictions
-- Provides step-by-step cooking instructions
+A single-agent culinary assistant that finds recipes and provides step-by-step cooking instructions. Demonstrates task context chaining (`context=[task]`) and `planning=True`.
 
-**Key Features:**
-- Agent with specific role and backstory
-- Multiple sequential tasks
-- Planning capabilities
-- LLM integration (GPT-4)
-
-**Usage:**
 ```bash
-python "Building your First AI Agent with CrewAI/1. Stateful_Applications_with_CrewAI.py"
+jupyter notebook 01_basics/stateful_culinary_assistant.ipynb
 ```
 
-### 2. Research Assistant in CrewAI
+### 02_multi_agent — Research Assistant
 
-**File:** `2. Research Assistant in CrewAI.py`
+**File:** `02_multi_agent/research_assistant.ipynb`
 
-A multi-agent system for market research:
-- **Market Researcher Agent**: Analyzes market trends using web search
-- **Product Strategist Agent**: Creates positioning strategies
+A two-agent market research pipeline: a **Market Researcher** searches the web with `SerperDevTool`, then a **Product Strategist** synthesizes findings into a positioning strategy.
 
-**Key Features:**
-- Multiple agents with different roles
-- Tool integration (SerperDevTool for web search)
-- Agent collaboration
-- Market intelligence gathering
-
-**Usage:**
 ```bash
-python "Building your First AI Agent with CrewAI/2. Research Assistant in CrewAI.py"
+jupyter notebook 02_multi_agent/research_assistant.ipynb
 ```
 
-### 3. Code Notebook
+### 02_multi_agent — Logistics Analysis
 
-**File:** `3. Code Notebook.ipynb`
+**File:** `02_multi_agent/logistics_analysis.ipynb`
 
-Comprehensive Jupyter notebook covering:
-- Recipe recommendation system
-- Marketing research workflow
-- Game flow with routing logic
+A sequential two-agent pipeline using `Process.sequential` and parameterized task inputs (`{variable}` placeholders + `kickoff(inputs={})`). Demonstrates `allow_delegation=False`.
 
-**Topics Covered:**
-- Agent creation and configuration
-- Task definition and execution
-- Crew orchestration
-- Flow control with routers and listeners
-- Token usage tracking
-
-**Usage:**
 ```bash
-jupyter notebook "Building your First AI Agent with CrewAI/3. Code Notebook.ipynb"
+jupyter notebook 02_multi_agent/logistics_analysis.ipynb
 ```
 
-### 4. Workflow with CrewAI
+### 03_flows — Workflow with Flows
 
-**File:** `4. Workflow_with_CrewAI.py`
+**File:** `03_flows/workflow_with_flows.ipynb`
 
-Demonstrates advanced flow control:
-- Game session management
-- Router-based decision making
-- Event listeners for different outcomes
-- State management with Pydantic models
+Demonstrates CrewAI's `Flow` system with `@start`, `@router`, and `@listen` decorators for deterministic, event-driven workflows with typed Pydantic state.
 
-**Key Concepts:**
-- `@start()` decorator for entry points
-- `@router()` for conditional branching
-- `@listen()` for event-driven actions
-- State persistence with BaseModel
-
-**Usage:**
 ```bash
-python "Building your First AI Agent with CrewAI/4. Workflow_with_CrewAI.py"
+jupyter notebook 03_flows/workflow_with_flows.ipynb
+```
+
+### 04_comprehensive — Complete Tutorial
+
+**File:** `04_comprehensive/complete_tutorial.ipynb`
+
+A unified notebook combining all three patterns (stateful tasks, multi-agent, flows) with token usage tracking via `crew.usage_metrics`.
+
+```bash
+jupyter notebook 04_comprehensive/complete_tutorial.ipynb
 ```
 
 ## 🔑 Key Concepts
@@ -159,10 +138,11 @@ External capabilities agents can use (e.g., web search, file operations, API cal
 
 ## 📝 Learning Path
 
-1. **Start with Basics**: Begin with `1. Stateful_Applications_with_CrewAI.py` to understand single-agent systems
-2. **Multi-Agent Systems**: Move to `2. Research Assistant in CrewAI.py` for agent collaboration
-3. **Interactive Learning**: Explore `3. Code Notebook.ipynb` for hands-on experiments
-4. **Advanced Workflows**: Study `4. Workflow_with_CrewAI.py` for complex flow patterns
+1. **Start with Basics**: `01_basics/stateful_culinary_assistant.ipynb` — single-agent, stateful task chaining
+2. **Multi-Agent Systems**: `02_multi_agent/research_assistant.ipynb` — agent collaboration with tools
+3. **Parameterized Pipelines**: `02_multi_agent/logistics_analysis.ipynb` — reusable crews with runtime inputs
+4. **Advanced Workflows**: `03_flows/workflow_with_flows.ipynb` — deterministic flows with routing
+5. **Everything Together**: `04_comprehensive/complete_tutorial.ipynb` — unified playground
 
 ## 💡 Use Cases
 
